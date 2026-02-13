@@ -1,0 +1,37 @@
+{
+    "global": [
+        "boykisser",
+        "miku",
+        "vtuber",
+        "gacha",
+        "furry",
+        "genshin",
+        "waifu",
+        "otaku",
+        "kawaii",
+        "loli",
+        "hentai",
+        "femboy",
+        "lgbt",
+        "gay",
+        "lesbian",
+        "transgender",
+        "pride",
+        "rainbow",
+        "queer",
+        "nonbinary",
+        "kiss",
+        "wolf",
+        "love",
+        "anime"
+    ],
+    "whitelisted_ids": [],
+    "blocked_ids": [
+        "AQAD3QxrG0TKgVBy"
+    ],
+    "video_photo": [],
+    "animation": [],
+    "sticker": [
+        "supernyashnisticosi"
+    ]
+}
