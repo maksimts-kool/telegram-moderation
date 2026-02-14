@@ -159,7 +159,7 @@ async def process_update(update_data: dict):
         ):
             await check_media(b, msg)
 
-async def send_and_delete(b: Bot, chat_id: int, text: str, delay: int = 5):
+async def send_and_delete(b: Bot, chat_id: int, text: str, delay: int = 3):
     """Send a message and auto-delete it after `delay` seconds."""
     try:
         sent = await b.send_message(chat_id, text)
@@ -430,8 +430,7 @@ async def check_media(b: Bot, msg):
             await send_and_delete(
                 b,
                 msg.chat.id,
-                f"⚠️ Message from {user.first_name} deleted: {reason}",
-                delay=5,
+                f"⚠️ Message from {user.first_name} deleted: {reason}"
             )
 
         except Exception as e:
