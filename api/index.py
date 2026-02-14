@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 MONGO_URI = os.environ.get(
     "MONGO_URI",
-    "mongodb+srv://qwerty:test@cluster0.ewyddvb.mongodb.net/",
+    "",
 )
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "change-this-secret")
