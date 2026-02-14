@@ -4,6 +4,7 @@ import asyncio
 import logging
 from datetime import datetime
 from functools import wraps
+import certifi
 
 from flask import (
     Flask,
@@ -39,19 +40,34 @@ app = Flask(__name__, template_folder=_template_dir)
 app.secret_key = os.environ.get("SECRET_KEY", "flask-secret-change-me")
 
 # --- MongoDB ---
-_client = MongoClient(MONGO_URI)
+
+
+_client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
 _db = _client["filter_bot"]
 filters_col = _db["filters"]
 logs_col = _db["logs"]
 pending_col = _db["pending_edits"]
 
-pending_col.create_index("created_at", expireAfterSeconds=300)
+# Lazy index creation — runs once then skips
+_indexes_created = False
+
+
+def _ensure_indexes():
+    global _indexes_created
+    if _indexes_created:
+        return
+    try:
+        pending_col.create_index("created_at", expireAfterSeconds=300)
+        _indexes_created = True
+    except Exception as e:
+        logger.warning(f"Index creation skipped: {e}")
 
 
 # ===================================================================
 # DATABASE HELPERS
 # ===================================================================
 def get_filters() -> dict:
+    _ensure_indexes()
     doc = filters_col.find_one({"_id": "main"})
     if not doc:
         default = {
