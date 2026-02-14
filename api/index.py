@@ -134,25 +134,22 @@ async def process_update(update_data: dict):
 
         msg = update.message
 
-        # /setwebhook helper
         if msg.text and msg.text.startswith("/setwebhook"):
-            await b.send_message(
+            await send_and_delete(
+                b,
                 msg.chat.id,
                 "Use the /setup_webhook admin route instead.",
             )
             return
 
-        # /block command
         if msg.text and msg.text.startswith("/block"):
             await handle_block_command(b, msg)
             return
 
-        # Pending keyword edit
         if msg.text and not msg.text.startswith("/"):
             await handle_pending_edit(b, msg)
             return
 
-        # Media filtering
         if (
             msg.photo
             or msg.video
@@ -162,6 +159,14 @@ async def process_update(update_data: dict):
         ):
             await check_media(b, msg)
 
+async def send_and_delete(b: Bot, chat_id: int, text: str, delay: int = 5):
+    """Send a message and auto-delete it after `delay` seconds."""
+    try:
+        sent = await b.send_message(chat_id, text)
+        await asyncio.sleep(delay)
+        await b.delete_message(chat_id, sent.message_id)
+    except Exception:
+        pass
 
 async def handle_block_command(b: Bot, msg):
     user_id = msg.from_user.id
@@ -169,10 +174,17 @@ async def handle_block_command(b: Bot, msg):
     parts = (msg.text or "").split()
     args = parts[1:] if len(parts) > 1 else []
 
+    # Delete the command message itself
+    try:
+        await b.delete_message(chat_id, msg.message_id)
+    except Exception:
+        pass
+
+    # Admin check in groups
     if msg.chat.type != "private":
         member = await b.get_chat_member(chat_id, user_id)
         if member.status not in ("creator", "administrator"):
-            await b.send_message(chat_id, "❌ Admins only.")
+            await send_and_delete(b, chat_id, "❌ Admins only.")
             return
 
     fd = get_filters()
@@ -210,7 +222,9 @@ async def handle_block_command(b: Bot, msg):
                 cat = "sticker"
 
             if not file_uid and not f_name:
-                await b.send_message(chat_id, "❌ No ID or filename found.")
+                await send_and_delete(
+                    b, chat_id, "❌ No ID or filename found."
+                )
                 return
 
             if mode in ("yes", "yesedit", "id_only"):
@@ -236,21 +250,26 @@ async def handle_block_command(b: Bot, msg):
                 response_text += f"\n✍️ Send the keyword to add to {cat}."
             elif mode in ("yes", "no") and f_name:
                 cleaned = clean_filename(f_name)
-                if cleaned.lower() not in [k.lower() for k in fd[cat]]:
+                if cleaned.lower() not in [
+                    k.lower() for k in fd[cat]
+                ]:
                     fd[cat].append(cleaned)
-                    response_text += f"\n✅ Blocked filename: {cleaned}"
+                    response_text += (
+                        f"\n✅ Blocked filename: {cleaned}"
+                    )
                 else:
                     response_text += (
                         f"\nℹ️ Filename {cleaned} already blocked."
                     )
 
         save_filter_data(fd)
-        await b.send_message(chat_id, response_text)
+        await send_and_delete(b, chat_id, response_text)
         return
 
-    # --- TEXT MODE ---
+    # --- TEXT MODE: /block category keyword ---
     if len(args) < 2:
-        await b.send_message(
+        await send_and_delete(
+            b,
             chat_id,
             (
                 "Usage:\n"
@@ -265,18 +284,20 @@ async def handle_block_command(b: Bot, msg):
     valid = ("global", "video_photo", "animation", "sticker")
 
     if category not in valid:
-        await b.send_message(
-            chat_id, f"❌ Invalid category. Use: {', '.join(valid)}"
+        await send_and_delete(
+            b, chat_id, f"❌ Invalid category. Use: {', '.join(valid)}"
         )
         return
 
     if keyword not in [k.lower() for k in fd[category]]:
         fd[category].append(keyword)
         save_filter_data(fd)
-        await b.send_message(chat_id, f"✅ Added '{keyword}' to {category}")
+        await send_and_delete(
+            b, chat_id, f"✅ Added '{keyword}' to {category}"
+        )
     else:
-        await b.send_message(
-            chat_id, f"ℹ️ '{keyword}' already in {category}"
+        await send_and_delete(
+            b, chat_id, f"ℹ️ '{keyword}' already in {category}"
         )
 
 
@@ -292,15 +313,21 @@ async def handle_pending_edit(b: Bot, msg):
     chat_id = msg.chat.id
     fd = get_filters()
 
+    # Delete the admin's text message
+    try:
+        await b.delete_message(chat_id, msg.message_id)
+    except Exception:
+        pass
+
     if keyword not in [k.lower() for k in fd[category]]:
         fd[category].append(keyword)
         save_filter_data(fd)
-        await b.send_message(
-            chat_id, f"✅ Added '{keyword}' to {category}"
+        await send_and_delete(
+            b, chat_id, f"✅ Added '{keyword}' to {category}"
         )
     else:
-        await b.send_message(
-            chat_id, f"ℹ️ '{keyword}' already in {category}"
+        await send_and_delete(
+            b, chat_id, f"ℹ️ '{keyword}' already in {category}"
         )
 
 
@@ -381,9 +408,11 @@ async def check_media(b: Bot, msg):
 
     if should_delete:
         try:
+            # Delete the offending message
             await b.delete_message(msg.chat.id, msg.message_id)
             logger.info(f"Deleted msg {msg.message_id}: {reason}")
 
+            # Log to database
             add_log(
                 {
                     "timestamp": datetime.utcnow().strftime(
@@ -397,10 +426,14 @@ async def check_media(b: Bot, msg):
                 }
             )
 
-            warning = await b.send_message(
-                msg.chat.id, f"⚠️ Message deleted: {reason}"
+            # Send warning and auto-delete after 5 seconds
+            await send_and_delete(
+                b,
+                msg.chat.id,
+                f"⚠️ Message from {user.first_name} deleted: {reason}",
+                delay=5,
             )
-            # Can't auto-delete in serverless; acceptable tradeoff
+
         except Exception as e:
             logger.error(f"Delete failed: {e}")
 
