@@ -484,7 +484,7 @@ def logout():
 
 
 @app.route("/")
-@login_required
+# @login_required  <-- REMOVE THIS DECORATOR
 def index():
     fd = get_filters()
     display_db = {
@@ -492,8 +492,14 @@ def index():
         for k, v in fd.items()
         if k not in ("_id", "logs")
     }
-    logs_list = get_logs()
-    logs_data = {"entries": logs_list}
+    
+    # Check login status before fetching logs
+    if session.get("logged_in"):
+        logs_list = get_logs()
+        logs_data = {"entries": logs_list}
+    else:
+        logs_data = {"entries": []}
+
     return render_template("index.html", db=display_db, logs=logs_data)
 
 
