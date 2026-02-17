@@ -82,12 +82,18 @@
         <div class="container">
             <a class="navbar-brand" href="#"><i class="fa-solid fa-robot me-2"></i>Filter Bot Admin</a>
             <div class="ms-auto">
+                {% if session.get('logged_in') %}
                 <a href="{{ url_for('setup_webhook') }}" class="btn btn-outline-success btn-sm me-2">
                     <i class="fa-solid fa-link me-1"></i> Set Webhook
                 </a>
                 <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">
                     <i class="fa-solid fa-right-from-bracket me-1"></i> Logout
                 </a>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm">
+                    <i class="fa-solid fa-right-to-bracket me-1"></i> Login
+                </a>
+                {% endif %}
             </div>
         </div>
     </nav>
@@ -112,6 +118,7 @@
                             <span class="badge badge-count rounded-pill ms-2">{{ items|length }}</span>
                         </span>
                     </div>
+                    {% if session.get('logged_in') %}
                     <div class="card-body border-bottom border-secondary p-2 bg-dark">
                         <form action="{{ url_for('add_item', category=category) }}" method="POST" class="d-flex">
                             <input type="text" name="item"
@@ -121,11 +128,13 @@
                                     class="fa-solid fa-plus"></i></button>
                         </form>
                     </div>
+                    {% endif %}
                     <div class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
                         {% for item in items %}
                         <div class="list-group-item">
                             <span class="text-break me-2">{{ item }}</span>
                             <div class="text-nowrap">
+                                {% if session.get('logged_in') %}
                                 <button class="btn btn-action btn-outline-warning me-1" data-bs-toggle="modal"
                                     data-bs-target="#editModal" data-category="{{ category }}"
                                     data-index="{{ loop.index0 }}" data-value="{{ item }}" onclick="setupEdit(this)">
@@ -135,6 +144,7 @@
                                     class="btn btn-action btn-outline-danger">
                                     <i class="fa-solid fa-xmark"></i>
                                 </a>
+                                {% endif %}
                             </div>
                         </div>
                         {% else %}
@@ -147,6 +157,7 @@
             {% endfor %}
         </div>
 
+        {% if session.get('logged_in') %}
         <div class="row mt-5">
             <div class="col-12">
                 <div class="card border-danger">
@@ -191,6 +202,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
