@@ -1,0 +1,22 @@
+{% if not logs %}
+<p class="text-center text-muted my-3">No logs available</p>
+{% else %}
+{% for log in logs %}
+<div class="log-entry animate__animated animate__fadeIn">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <span class="badge bg-primary rounded-pill">{{ log.media_type }}</span>
+        <small class="text-muted">{{ log.timestamp }}</small>
+    </div>
+    <div class="log-content">
+        <strong>{{ log.username }}</strong> ({{ log.user_id }}):
+        <span class="text-danger small">{{ log.reason }}</span>
+        <p class="mb-0 mt-1 fst-italic text-truncate px-2 border-start border-secondary"
+            style="font-size: 0.85rem; background: rgba(255,255,255,0.05);">
+            {{ log.content if log.content else 'No caption' }}
+        </p>
+    </div>
+</div>
+{% if not loop.last %}
+<hr class="my-2 opacity-25">{% endif %}
+{% endfor %}
+{% endif %}

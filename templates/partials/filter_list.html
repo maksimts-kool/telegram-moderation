@@ -1,0 +1,14 @@
+{% for item in items %}
+<li class="list-group-item d-flex justify-content-between align-items-center animate__animated animate__fadeIn">
+    <div class="d-flex align-items-center flex-grow-1 me-3">
+        <span class="text-break">{{ item }}</span>
+    </div>
+    <div class="btn-group">
+        <button class="btn btn-outline-danger btn-sm"
+            hx-delete="{{ url_for('remove_item', category=category, index_id=loop.index0) }}"
+            hx-target="#{{ category }}-list" hx-swap="innerHTML" hx-confirm="Delete this item?">
+            <i class="fa-solid fa-trash"></i>
+        </button>
+    </div>
+</li>
+{% endfor %}

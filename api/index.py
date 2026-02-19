@@ -42,15 +42,15 @@ app.secret_key = os.environ.get("SECRET_KEY", "flask-secret-change-me")
 # --- MongoDB ---
 
 
-_client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+_client = MongoClient(MONGO_URI, tlsCAFile=certifi.where(), serverSelectionTimeoutMS=5000)
 _db = _client["filter_bot"]
 filters_col = _db["filters"]
 logs_col = _db["logs"]
 pending_col = _db["pending_edits"]
 
-# Lazy index creation — runs once then skips
+# Global cache for filters (basic optimization)
+_filters_cache = None
 _indexes_created = False
-
 
 def _ensure_indexes():
     global _indexes_created
@@ -63,10 +63,11 @@ def _ensure_indexes():
         logger.warning(f"Index creation skipped: {e}")
 
 
-# ===================================================================
-# DATABASE HELPERS
-# ===================================================================
-def get_filters() -> dict:
+def get_filters(use_cache: bool = False) -> dict:
+    global _filters_cache
+    if use_cache and _filters_cache:
+        return _filters_cache
+    
     _ensure_indexes()
     doc = filters_col.find_one({"_id": "main"})
     if not doc:
@@ -80,13 +81,18 @@ def get_filters() -> dict:
             "blocked_ids": [],
         }
         filters_col.insert_one(default)
+        _filters_cache = default
         return default
+    
+    _filters_cache = doc
     return doc
 
 
 def save_filter_data(data: dict):
+    global _filters_cache
     data["_id"] = "main"
     filters_col.replace_one({"_id": "main"}, data, upsert=True)
+    _filters_cache = data
 
 
 def add_log(entry: dict):
@@ -484,44 +490,47 @@ def logout():
 
 
 @app.route("/")
-# @login_required  <-- REMOVE THIS DECORATOR
+@login_required
 def index():
     fd = get_filters()
-    display_db = {
-        k: v
-        for k, v in fd.items()
-        if k not in ("_id", "logs")
-    }
-    
-    # Check login status before fetching logs
-    if session.get("logged_in"):
-        logs_list = get_logs()
-        logs_data = {"entries": logs_list}
-    else:
-        logs_data = {"entries": []}
+    display_db = {k: v for k, v in fd.items() if k not in ("_id", "logs")}
+    logs_list = get_logs()
+    return render_template("index.html", db=display_db, logs=logs_list)
 
-    return render_template("index.html", db=display_db, logs=logs_data)
+@app.route("/logs")
+@login_required
+def get_logs_fragment():
+    logs_list = get_logs()
+    return render_template("partials/logs.html", logs=logs_list)
 
 
 @app.route("/add_item/<category>", methods=["POST"])
 @login_required
 def add_item(category):
     item = request.form.get("item", "").strip()
-    if item:
-        fd = get_filters()
-        if category in fd and item not in fd[category]:
-            fd[category].append(item)
-            save_filter_data(fd)
+    if not item:
+        return "", 204
+
+    fd = get_filters()
+    if category in fd and item not in fd[category]:
+        fd[category].append(item)
+        save_filter_data(fd)
+    
+    if request.headers.get("HX-Request"):
+        return render_template("partials/filter_list.html", category=category, items=fd[category])
     return redirect(url_for("index"))
 
 
-@app.route("/remove_item/<category>/<int:index_id>")
+@app.route("/remove_item/<category>/<int:index_id>", methods=["DELETE", "GET"])
 @login_required
 def remove_item(category, index_id):
     fd = get_filters()
     if category in fd and 0 <= index_id < len(fd[category]):
-        fd[category].pop(index_id)
+        item = fd[category].pop(index_id)
         save_filter_data(fd)
+    
+    if request.headers.get("HX-Request"):
+        return render_template("partials/filter_list.html", category=category, items=fd[category])
     return redirect(url_for("index"))
 
 
@@ -534,6 +543,9 @@ def edit_item(category, index_id):
         if category in fd and 0 <= index_id < len(fd[category]):
             fd[category][index_id] = new_value
             save_filter_data(fd)
+    
+    if request.headers.get("HX-Request"):
+        return render_template("partials/filter_list.html", category=category, items=get_filters()[category])
     return redirect(url_for("index"))
 
 
